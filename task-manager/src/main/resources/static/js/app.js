@@ -15,6 +15,39 @@ const submitButton = document.getElementById("submit-button");
 const cancelButton = document.getElementById("cancel-button");
 const refreshButton = document.getElementById("refresh-button");
 
+// WebSocket – připojení k backendu
+const stompClient = new StompJs.Client({
+  brokerURL: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
+
+  // Automatické opětovné připojení při výpadku
+  reconnectDelay: 5000,
+
+  // Co se stane po úspěšném připojení
+  onConnect: () => {
+    console.log("WebSocket připojen.");
+
+    // Odběr oznámení o změnách úkolů
+    stompClient.subscribe("/topic/tasks", (message) => {
+      console.log("Přijata WebSocket zpráva:", message.body);
+
+      // Aktualizace seznamu úkolů
+      loadTasks();
+    });
+  },
+
+  // Zachycení chyb
+  onStompError: (frame) => {
+    console.error("WebSocket chyba:", frame.headers["message"]);
+  },
+
+  onWebSocketError: (error) => {
+    console.error("WebSocket spojení selhalo:", error);
+  },
+});
+
+// Aktivace spojení
+stompClient.activate();
+
 // Načtení všech úkolů
 async function loadTasks() {
   try {
