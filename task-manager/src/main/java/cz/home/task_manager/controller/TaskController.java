@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -44,8 +45,12 @@ public class TaskController {
 
     // POST – vytvoření nového úkolu
     @PostMapping
-    public Task createTask(@Valid @RequestBody Task task) {
-        return taskService.createTask(task);
+    public ResponseEntity<Task> createTask(@Valid @RequestBody Task task) {
+        Task createdTask = taskService.createTask(task);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(createdTask);
     }
 
     // PUT – aktualizace úkolu
@@ -75,8 +80,10 @@ public class TaskController {
 
     // DELETE – odstranění úkolu
     @DeleteMapping("/{id}")
-    public void deleteTask(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
+
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/search")
