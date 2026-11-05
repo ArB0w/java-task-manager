@@ -15,27 +15,26 @@ const submitButton = document.getElementById("submit-button");
 const cancelButton = document.getElementById("cancel-button");
 const refreshButton = document.getElementById("refresh-button");
 
+// Filtrační elementy
+const searchTitleInput = document.getElementById("search-title");
+const filterCompletedSelect = document.getElementById("filter-completed");
+
 // WebSocket – připojení k backendu
 const stompClient = new StompJs.Client({
   brokerURL: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
-
-  // Automatické opětovné připojení při výpadku
   reconnectDelay: 5000,
 
-  // Co se stane po úspěšném připojení
   onConnect: () => {
     console.log("WebSocket připojen.");
 
-    // Odběr oznámení o změnách úkolů
     stompClient.subscribe("/topic/tasks", (message) => {
       console.log("Přijata WebSocket zpráva:", message.body);
 
-      // Aktualizace seznamu úkolů
+      // Načtení úkolů se zachováním filtrů
       loadTasks();
     });
   },
 
-  // Zachycení chyb
   onStompError: (frame) => {
     console.error("WebSocket chyba:", frame.headers["message"]);
   },
@@ -45,15 +44,30 @@ const stompClient = new StompJs.Client({
   },
 });
 
-// Aktivace spojení
 stompClient.activate();
 
-// Načtení všech úkolů
+// Načtení úkolů podle aktuálních filtrů
 async function loadTasks() {
   try {
     statusMessage.textContent = "Načítám úkoly...";
 
-    const response = await fetch(API_URL);
+    const params = new URLSearchParams();
+
+    const title = searchTitleInput.value.trim();
+    const completed = filterCompletedSelect.value;
+
+    if (title) {
+      params.append("title", title);
+    }
+
+    if (completed !== "") {
+      params.append("completed", completed);
+    }
+
+    const query = params.toString();
+    const url = query ? `${API_URL}/search?${query}` : `${API_URL}/search`;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error("Nepodařilo se načíst úkoly.");
@@ -76,7 +90,7 @@ function renderTasks(tasks) {
   if (tasks.length === 0) {
     const message = document.createElement("p");
     message.className = "empty-message";
-    message.textContent = "Zatím nemáš žádné úkoly.";
+    message.textContent = "Žádné úkoly neodpovídají zadaným filtrům.";
 
     tasksList.appendChild(message);
     return;
@@ -135,9 +149,7 @@ function renderTasks(tasks) {
     });
 
     actions.append(completeButton, editButton, deleteButton);
-
     card.append(title, description, meta, actions);
-
     tasksList.appendChild(card);
   });
 }
@@ -260,6 +272,10 @@ cancelButton.addEventListener("click", resetForm);
 
 // Obnovení seznamu
 refreshButton.addEventListener("click", loadTasks);
+
+// Reakce na změnu filtrů
+searchTitleInput.addEventListener("input", loadTasks);
+filterCompletedSelect.addEventListener("change", loadTasks);
 
 // První načtení úkolů po otevření stránky
 loadTasks();

@@ -79,4 +79,19 @@ public class TaskService {
 
         messagingTemplate.convertAndSend("/topic/tasks", event);
     }
+
+    public List<Task> searchTasks(String title) {
+        return taskRepository.findByTitleContainingIgnoreCase(title);
+    }
+
+    public List<Task> getTasksByCompleted(boolean completed) {
+        return taskRepository.findByCompleted(completed);
+    }
+
+    public List<Task> searchTasksByCompleted(boolean completed, String title) {
+        return taskRepository.findByCompletedAndTitleContainingIgnoreCase(
+                completed,
+                title
+        );
+    }
 }

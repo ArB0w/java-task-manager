@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import cz.home.task_manager.model.Task;
@@ -55,5 +56,25 @@ public class TaskController {
     @DeleteMapping("/{id}")
     public void deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
+    }
+
+    @GetMapping("/search")
+    public List<Task> searchTasks(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) Boolean completed) {
+
+        if (title != null && completed != null) {
+            return taskService.searchTasksByCompleted(completed, title);
+        }
+
+        if (title != null) {
+            return taskService.searchTasks(title);
+        }
+
+        if (completed != null) {
+            return taskService.getTasksByCompleted(completed);
+        }
+
+        return taskService.getAllTasks();
     }
 }
