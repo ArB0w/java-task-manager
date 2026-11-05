@@ -94,4 +94,16 @@ public class TaskService {
                 title
         );
     }
+
+    public Task updateTaskCompletion(Long id, boolean completed) {
+        Task task = getTaskById(id);
+
+        task.setCompleted(completed);
+
+        Task updatedTask = taskRepository.save(task);
+
+        sendTaskEvent("TASK_UPDATED", updatedTask.getId());
+
+        return updatedTask;
+    }
 }

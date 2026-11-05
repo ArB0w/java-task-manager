@@ -1,9 +1,12 @@
 package cz.home.task_manager.controller;
 
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import cz.home.task_manager.model.Task;
 import cz.home.task_manager.service.TaskService;
@@ -50,6 +54,23 @@ public class TaskController {
             @PathVariable Long id,
             @Valid @RequestBody Task task) {
         return taskService.updateTask(id, task);
+    }
+
+    @PatchMapping("/{id}/completed")
+    public Task updateTaskCompletion(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> request) {
+
+        Boolean completed = request.get("completed");
+
+        if (completed == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Missing completed field"
+            );
+        }
+
+        return taskService.updateTaskCompletion(id, completed);
     }
 
     // DELETE – odstranění úkolu

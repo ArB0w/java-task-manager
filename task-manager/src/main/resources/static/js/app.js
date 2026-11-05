@@ -231,27 +231,22 @@ async function deleteTask(id) {
 
 // Změna stavu dokončení
 async function toggleTaskCompletion(task) {
-  const updatedTask = {
-    title: task.title,
-    description: task.description,
-    completed: !task.completed,
-    dueDate: task.dueDate,
-  };
-
   try {
-    const response = await fetch(`${API_URL}/${task.id}`, {
-      method: "PUT",
+    const response = await fetch(`${API_URL}/${task.id}/completed`, {
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(updatedTask),
+      body: JSON.stringify({
+        completed: !task.completed,
+      }),
     });
 
     if (!response.ok) {
       throw new Error("Nepodařilo se změnit stav úkolu.");
     }
 
-    await loadTasks();
+    loadTasks();
   } catch (error) {
     statusMessage.textContent = error.message;
   }
