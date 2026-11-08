@@ -138,32 +138,62 @@ V PostgreSQL je potřeba vytvořit databázi `task_manager` a uživatele s odpov
 
 Připojení k databázi je nutné nakonfigurovat v souboru `application.properties` podle lokálního prostředí.
 
-### Spuštění aplikace
+### Spouštění a správa aplikace
 
-V kořenovém adresáři projektu spusť:
+**PostgreSQL**
+
+Zobrazení stavu služby:
+
+```bash
+sudo service postgresql status
+```
+
+Spuštění služby:
+
+```bash
+sudo service postgresql start
+```
+
+Zastavení služby:
+
+```bash
+sudo service postgresql stop
+```
+
+**Maven / Spring Boot**
+
+Spuštění aplikace:
 
 ```bash
 ./mvnw spring-boot:run
+```
+
+Spuštění testů:
+
+```bash
+./mvnw test
+```
+
+Smazání předchozích sestavených souborů:
+
+```bash
+./mvnw clean
+```
+
+Kompletní vyčištění a spuštění testů:
+
+```bash
+./mvnw clean test
 ```
 
 Aplikace bude standardně dostupná na:
 
 `http://localhost:8080`
 
-### Testování
-
-Spuštění testů:
-
-```bash
-./mvnw clean test
-```
-
-Projekt obsahuje jednotkové testy servisní vrstvy a integrační testy REST API.
-
 ## Plánovaná rozšíření
 
 - Integrační testy WebSocket komunikace.
-- Verzování databázového schématu pomocí Flyway - migrace.
+- Verzování databázového schématu pomocí Flyway – migrace.
 - Kontejnerizace aplikace a databáze pomocí Dockeru a Docker Compose.
 - Dokumentace REST API pomocí OpenAPI / Swagger.
 - Další bezpečnostní úpravy a příprava produkčního nasazení.
