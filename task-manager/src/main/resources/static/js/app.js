@@ -1,6 +1,24 @@
 const API_URL = "/api/tasks";
+const AUTH_URL = "/api/auth";
 
-// HTML elementy
+// HTML elementy – autentizace
+const authSection = document.getElementById("auth-section");
+const appSection = document.getElementById("app-section");
+
+const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
+
+const loginEmailInput = document.getElementById("login-email");
+const loginPasswordInput = document.getElementById("login-password");
+
+const registerEmailInput = document.getElementById("register-email");
+const registerPasswordInput = document.getElementById("register-password");
+
+const authMessage = document.getElementById("auth-message");
+const userInfo = document.getElementById("user-info");
+const logoutButton = document.getElementById("logout-button");
+
+// HTML elementy – úkoly
 const taskForm = document.getElementById("task-form");
 const tasksList = document.getElementById("tasks-list");
 const statusMessage = document.getElementById("status-message");
@@ -19,6 +37,35 @@ const refreshButton = document.getElementById("refresh-button");
 const searchTitleInput = document.getElementById("search-title");
 const filterCompletedSelect = document.getElementById("filter-completed");
 
+// Přihlašovací údaje – zůstávají pouze v paměti stránky
+let currentUsername = null;
+let currentPassword = null;
+
+// Vytvoření HTTP Basic autorizační hlavičky
+function getAuthorizationHeader() {
+  const credentials = `${currentUsername}:${currentPassword}`;
+
+  // Převod UTF-8 řetězce na Base64
+  const bytes = new TextEncoder().encode(credentials);
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join(
+    "",
+  );
+
+  return `Basic ${btoa(binary)}`;
+}
+
+// Společná funkce pro REST požadavky
+function authenticatedFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+
+  headers.set("Authorization", getAuthorizationHeader());
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 // WebSocket – připojení k backendu
 const stompClient = new StompJs.Client({
   brokerURL: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
@@ -27,12 +74,12 @@ const stompClient = new StompJs.Client({
   onConnect: () => {
     console.log("WebSocket připojen.");
 
-    stompClient.subscribe("/topic/tasks", (message) => {
-      console.log("Přijata WebSocket zpráva:", message.body);
-
-      // Načtení úkolů se zachováním filtrů
+    stompClient.subscribe("/user/queue/tasks", (message) => {
+      console.log("Přijatá WebSocket událost:", message.body);
       loadTasks();
     });
+
+    console.log("Odběr /user/queue/tasks aktivní.");
   },
 
   onStompError: (frame) => {
@@ -44,10 +91,123 @@ const stompClient = new StompJs.Client({
   },
 });
 
-stompClient.activate();
+// Připojení uživatele k aplikaci
+async function login(username, password) {
+  currentUsername = username;
+  currentPassword = password;
+
+  try {
+    // Ověření přihlašovacích údajů pomocí REST API
+    const response = await authenticatedFetch(`${API_URL}/search`);
+
+    console.log("STOMP connected:", stompClient.connected);
+    console.log("STOMP active:", stompClient.active);
+    if (!response.ok) {
+      throw new Error("Neplatný e-mail nebo heslo.");
+    }
+
+    authSection.hidden = true;
+    appSection.hidden = false;
+
+    userInfo.textContent = `Přihlášený uživatel: ${username}`;
+
+    // Přihlašovací údaje pro STOMP CONNECT
+    stompClient.connectHeaders = {
+      username: currentUsername,
+      password: currentPassword,
+    };
+
+    // WebSocket připojíme až po úspěšném přihlášení
+    if (!stompClient.active) {
+      await stompClient.activate();
+    }
+
+    await loadTasks();
+
+    authMessage.textContent = "";
+  } catch (error) {
+    currentUsername = null;
+    currentPassword = null;
+
+    authMessage.textContent = error.message;
+  }
+}
+
+// Přihlášení
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const username = loginEmailInput.value.trim();
+  const password = loginPasswordInput.value;
+
+  await login(username, password);
+});
+
+// Registrace
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const user = {
+    email: registerEmailInput.value.trim(),
+    password: registerPasswordInput.value,
+  };
+
+  try {
+    const response = await fetch(`${AUTH_URL}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(user),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+
+      throw new Error(error?.message || "Registrace se nezdařila.");
+    }
+
+    authMessage.textContent =
+      "Registrace proběhla úspěšně. Nyní se můžeš přihlásit.";
+
+    loginEmailInput.value = user.email;
+    loginPasswordInput.value = user.password;
+
+    registerForm.reset();
+  } catch (error) {
+    authMessage.textContent = error.message;
+  }
+});
+
+// Odhlášení
+logoutButton.addEventListener("click", async () => {
+  if (stompClient.active) {
+    await stompClient.deactivate();
+  }
+
+  currentUsername = null;
+  currentPassword = null;
+
+  appSection.hidden = true;
+  authSection.hidden = false;
+
+  loginForm.reset();
+  registerForm.reset();
+  taskForm.reset();
+
+  tasksList.replaceChildren();
+  statusMessage.textContent = "";
+  authMessage.textContent = "Byl jsi odhlášen.";
+
+  resetForm();
+});
 
 // Načtení úkolů podle aktuálních filtrů
 async function loadTasks() {
+  if (!currentUsername) {
+    return;
+  }
+
   try {
     statusMessage.textContent = "Načítám úkoly...";
 
@@ -67,7 +227,7 @@ async function loadTasks() {
     const query = params.toString();
     const url = query ? `${API_URL}/search?${query}` : `${API_URL}/search`;
 
-    const response = await fetch(url);
+    const response = await authenticatedFetch(url);
 
     if (!response.ok) {
       throw new Error("Nepodařilo se načíst úkoly.");
@@ -168,13 +328,16 @@ taskForm.addEventListener("submit", async (event) => {
   };
 
   try {
-    const response = await fetch(id ? `${API_URL}/${id}` : API_URL, {
-      method: id ? "PUT" : "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await authenticatedFetch(
+      id ? `${API_URL}/${id}` : API_URL,
+      {
+        method: id ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(task),
       },
-      body: JSON.stringify(task),
-    });
+    );
 
     if (!response.ok) {
       throw new Error("Nepodařilo se uložit úkol.");
@@ -214,7 +377,7 @@ async function deleteTask(id) {
   }
 
   try {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await authenticatedFetch(`${API_URL}/${id}`, {
       method: "DELETE",
     });
 
@@ -232,21 +395,24 @@ async function deleteTask(id) {
 // Změna stavu dokončení
 async function toggleTaskCompletion(task) {
   try {
-    const response = await fetch(`${API_URL}/${task.id}/completed`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await authenticatedFetch(
+      `${API_URL}/${task.id}/completed`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          completed: !task.completed,
+        }),
       },
-      body: JSON.stringify({
-        completed: !task.completed,
-      }),
-    });
+    );
 
     if (!response.ok) {
       throw new Error("Nepodařilo se změnit stav úkolu.");
     }
 
-    loadTasks();
+    await loadTasks();
   } catch (error) {
     statusMessage.textContent = error.message;
   }
@@ -271,6 +437,3 @@ refreshButton.addEventListener("click", loadTasks);
 // Reakce na změnu filtrů
 searchTitleInput.addEventListener("input", loadTasks);
 filterCompletedSelect.addEventListener("change", loadTasks);
-
-// První načtení úkolů po otevření stránky
-loadTasks();
